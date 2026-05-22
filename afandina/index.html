@@ -234,7 +234,7 @@
 
             localQueue.forEach((customer, index) => {
                 list.innerHTML += `
-                    <div class="admin-card fade-in-up">
+                    <div class="admin-card">
                         <div style="text-align: right; flex-grow: 1;">
                             <strong>${index + 1}. ${customer.name}</strong> 
                             <div class="service-tag">${customer.service}</div>
@@ -313,9 +313,7 @@
 
         window.closeModal = function() {
             const modal = document.getElementById('image-modal');
-            const modalImg = document.getElementById('modal-img');
             modal.classList.add('hidden');
-            setTimeout(() => { modalImg.src = ''; }, 300);
         };
 
         if ('serviceWorker' in navigator) {
@@ -327,346 +325,106 @@
     </script>
 
     <style>
-        :root { --gold: #d4af37; --dark: #121212; --gray: rgba(42, 42, 42, 0.75); --text: #ffffff; --whatsapp: #25D366; }
+        :root { --gold: #d4af37; --dark: #121212; --gray: #2a2a2a; --text: #ffffff; --whatsapp: #25D366; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--dark); color: var(--text); margin: 0; padding: 0; text-align: center; }
         
-        /* تأثير الخلفية المفرغة للفيديو الأساسي */
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background-color: #000; 
-            color: var(--text); 
-            margin: 0; 
-            padding: 0; 
-            text-align: center; 
-            overflow-x: hidden;
-        }
-
-        /* تنسيقات مشغل الفيديو في الخلفية */
-        #bg-video {
-            position: fixed;
-            right: 0;
-            bottom: 0;
-            min-width: 100%;
-            min-height: 100%;
-            z-index: -2;
-            object-fit: cover;
-            filter: grayscale(40%) brightness(45%); /* تصفية الألوان لثيم صالون كلاسيكي فاخر */
-        }
-
-        .video-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(180deg, rgba(18, 18, 18, 0.5) 0%, rgba(0, 0, 0, 0.85) 100%);
-            z-index: -1;
-        }
+        header { background-color: var(--gray); padding: 20px; border-bottom: 3px solid var(--gold); position: relative; }
+        h1 { color: var(--gold); margin: 0; font-size: 2.5rem; letter-spacing: 2px;}
+        p.manager { margin: 5px 0 0; font-size: 0.9rem; color: #aaa; }
         
-        header { 
-            background-color: rgba(20, 20, 20, 0.85); 
-            padding: 25px 20px; 
-            border-bottom: 3px solid var(--gold); 
-            position: relative; 
-            backdrop-filter: blur(8px);
-            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
-        }
-        
-        h1 { 
-            color: var(--gold); 
-            margin: 0; 
-            font-size: 2.7rem; 
-            letter-spacing: 3px;
-            text-shadow: 0 0 10px rgba(212, 175, 55, 0.4);
-            animation: textGlow 3s ease-in-out infinite alternate;
-        }
-        p.manager { margin: 8px 0 0; font-size: 0.95rem; color: #ccc; font-weight: 300; }
-        
+        /* التصميم الجديد لأيقونة المطور */
         .dev-profile-icon {
             position: absolute;
-            top: 22px;
-            left: 20px;
-            color: var(--gold);
-            text-decoration: none;
+            top: 15px;
+            right: 15px; 
+            background-color: var(--gold);
+            color: var(--dark);
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
             display: flex;
             flex-direction: column;
+            justify-content: center;
             align-items: center;
-            font-size: 0.75rem;
-            transition: all 0.3s ease;
+            text-decoration: none;
+            font-size: 0.65rem;
+            transition: transform 0.3s ease;
             font-weight: bold;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.5);
+            border: 2px solid #fff;
         }
         .dev-profile-icon:hover {
-            transform: scale(1.1) rotate(-5deg);
-            color: #fff;
-            text-shadow: 0 0 8px var(--gold);
+            transform: scale(1.1);
+            background-color: #fff;
         }
         .dev-profile-icon svg {
-            width: 24px;
-            height: 24px;
-            margin-bottom: 3px;
+            width: 20px;
+            height: 20px;
+            margin-bottom: 2px;
         }
 
-        /* حاوية محتوى أنيقة مع تأثير الزجاج الضبابي (Glassmorphism) وطاقة حركية للظهور */
-        .container { 
-            max-width: 600px; 
-            margin: 35px auto; 
-            padding: 25px; 
-            background-color: var(--gray); 
-            border-radius: 15px; 
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(212, 175, 55, 0.2);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.7); 
-            width: 90%; 
-            box-sizing: border-box; 
-            animation: fadeInUp 0.8s ease-out forwards;
-        }
+        .container { max-width: 600px; margin: 30px auto; padding: 20px; background-color: var(--gray); border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); width: 90%; box-sizing: border-box; }
+        input[type="text"], input[type="tel"], input[type="password"], input[type="number"] { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid var(--gold); background-color: var(--dark); color: white; border-radius: 5px; box-sizing: border-box; font-family: inherit; font-size: 1rem; text-align: center;}
         
-        input[type="text"], input[type="tel"], input[type="password"], input[type="number"] { 
-            width: 100%; 
-            padding: 14px; 
-            margin: 12px 0; 
-            border: 1px solid rgba(212, 175, 55, 0.5); 
-            background-color: rgba(18, 18, 18, 0.8); 
-            color: white; 
-            border-radius: 8px; 
-            box-sizing: border-box; 
-            font-family: inherit; 
-            font-size: 1rem; 
-            text-align: center;
-            transition: all 0.3s ease;
-        }
-        input[type="text"]:focus, input[type="tel"]:focus, input[type="password"]:focus {
-            border-color: var(--gold);
-            box-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
-            outline: none;
-            background-color: rgba(18, 18, 18, 0.95);
-        }
-        
-        .checkbox-group { 
-            text-align: right; 
-            background-color: rgba(18, 18, 18, 0.7); 
-            border: 1px solid rgba(212, 175, 55, 0.3); 
-            border-radius: 8px; 
-            padding: 15px; 
-            margin: 15px 0; 
-            display: grid; 
-            grid-template-columns: 1fr 1fr; 
-            gap: 14px; 
-            direction: rtl;
-        }
-        .checkbox-label { 
-            display: flex; 
-            align-items: center; 
-            gap: 10px; 
-            cursor: pointer; 
-            font-size: 0.95rem; 
-            user-select: none; 
-            transition: transform 0.2s ease, color 0.2s;
-        }
-        .checkbox-label:hover {
-            transform: translateX(-3px);
-            color: var(--gold);
-        }
-        .checkbox-label input[type="checkbox"] { 
-            width: 19px; 
-            height: 19px; 
-            accent-color: var(--gold); 
-            cursor: pointer; 
-            margin: 0; 
-        }
+        .checkbox-group { text-align: right; background-color: var(--dark); border: 1px solid var(--gold); border-radius: 5px; padding: 15px; margin: 10px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; direction: rtl;}
+        .checkbox-label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.95rem; user-select: none; }
+        .checkbox-label input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--gold); cursor: pointer; margin: 0; }
         @media (max-width: 400px) { .checkbox-group { grid-template-columns: 1fr; } } 
 
-        button { 
-            background-color: var(--gold); 
-            color: #000; 
-            border: none; 
-            padding: 14px 25px; 
-            font-size: 1.1rem; 
-            font-weight: bold; 
-            border-radius: 8px; 
-            cursor: pointer; 
-            width: 100%; 
-            margin-top: 12px; 
-            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); 
-            box-shadow: 0 4px 10px rgba(212, 175, 55, 0.2);
-        }
-        button:hover:not(:disabled) { 
-            background-color: #f7d154; 
-            transform: translateY(-2px); 
-            box-shadow: 0 6px 15px rgba(212, 175, 55, 0.4);
-        }
-        button:active:not(:disabled) {
-            transform: translateY(1px);
-        }
-        button:disabled { background-color: #555; cursor: not-allowed; color: #888; box-shadow: none; }
+        button { background-color: var(--gold); color: var(--dark); border: none; padding: 12px 25px; font-size: 1.1rem; font-weight: bold; border-radius: 5px; cursor: pointer; width: 100%; margin-top: 10px; transition: 0.3s; }
+        button:hover:not(:disabled) { background-color: #b5952f; transform: scale(0.98); }
+        button:disabled { background-color: #555; cursor: not-allowed; color: #888; }
         
-        .btn-whatsapp { 
-            background-color: var(--whatsapp); 
-            color: white; 
-            box-shadow: 0 4px 10px rgba(37, 211, 102, 0.2);
-        }
-        .btn-whatsapp:hover:not(:disabled) { 
-            background-color: #2edb72; 
-            box-shadow: 0 6px 15px rgba(37, 211, 102, 0.4);
-        }
+        .btn-whatsapp { background-color: var(--whatsapp); color: white; }
+        .btn-whatsapp:hover:not(:disabled) { background-color: #20ba5a; }
 
         .hidden { display: none !important; }
         
         .status-box { padding: 20px; margin-top: 15px; border-radius: 8px; font-size: 1.5rem; font-weight: bold; transition: all 0.3s; }
-        .status-wait { background-color: #ff9800; color: white; box-shadow: 0 0 15px rgba(255,152,0,0.3); }
+        .status-wait { background-color: #ff9800; color: white; }
         .status-now { background-color: #4caf50; color: white; }
-        .wait-info { background-color: rgba(18, 18, 18, 0.8); padding: 15px; margin-top: 15px; border-radius: 5px; border: 1px dashed var(--gold); line-height: 1.8; }
+        .wait-info { background-color: var(--dark); padding: 15px; margin-top: 15px; border-radius: 5px; border: 1px dashed var(--gold); line-height: 1.8; }
         
         @keyframes pulsing {
             0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
-            70% { transform: scale(1.04); box-shadow: 0 0 0 15px rgba(76, 175, 80, 0); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(76, 175, 80, 0); }
             100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
         }
         .pulse { animation: pulsing 2s infinite; }
 
-        .admin-card { background-color: rgba(18, 18, 18, 0.85); padding: 15px; margin: 15px 0; border: 1px solid #444; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .admin-card { background-color: var(--dark); padding: 15px; margin: 15px 0; border: 1px solid #444; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
         .admin-btns { display: flex; flex-direction: column; gap: 5px; min-width: 100px; }
-        .btn-now { background-color: #4caf50; color: white; border: none; padding: 7px; width: 100%; font-size: 0.85rem; border-radius: 4px;}
-        .btn-done { background-color: #2196f3; color: white; border: none; padding: 7px; width: 100%; font-size: 0.85rem; border-radius: 4px;}
-        .btn-delete { background-color: #f44336; color: white; border: none; padding: 7px; width: 100%; font-size: 0.85rem; border-radius: 4px;}
+        .btn-now { background-color: #4caf50; color: white; border: none; padding: 6px; width: 100%; font-size: 0.85rem;}
+        .btn-done { background-color: #2196f3; color: white; border: none; padding: 6px; width: 100%; font-size: 0.85rem;}
+        .btn-delete { background-color: #f44336; color: white; border: none; padding: 6px; width: 100%; font-size: 0.85rem;}
         .service-tag { display: inline-block; font-size: 0.8rem; background: #333; color: var(--gold); padding: 4px 8px; border-radius: 4px; margin: 5px 0; line-height: 1.4;}
         
-        .add-manual-box, .stats-box { background-color: rgba(26, 26, 26, 0.85); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #333; }
+        .add-manual-box, .stats-box { background-color: #1a1a1a; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #333; }
         .stats-box { font-size: 1.2rem; color: var(--gold); font-weight: bold; }
-        .nav-link { color: var(--gold); cursor: pointer; margin-top: 25px; display: inline-block; text-decoration: underline; font-size: 0.95rem; transition: color 0.2s; }
-        .nav-link:hover { color: #f7d154; }
+        .nav-link { color: var(--gold); cursor: pointer; margin-top: 25px; display: inline-block; text-decoration: underline; font-size: 0.9rem; }
         
-        .btn-cancel { background-color: #f44336; color: white; margin-top: 15px; font-size: 1rem; padding: 12px; box-shadow: 0 4px 10px rgba(244,67,54,0.2); }
-        .btn-cancel:hover { background-color: #ff5246; box-shadow: 0 6px 15px rgba(244,67,54,0.4); }
-        .shop-closed-banner { background-color: rgba(58, 26, 26, 0.85); border: 2px dashed #f44336; padding: 25px; border-radius: 8px; font-size: 1.2rem; color: #ff8888; margin-top: 10px; }
+        .btn-cancel { background-color: #f44336; color: white; margin-top: 15px; font-size: 1rem; padding: 10px; }
+        .shop-closed-banner { background-color: #3a1a1a; border: 2px dashed #f44336; padding: 25px; border-radius: 8px; font-size: 1.2rem; color: #ff8888; margin-top: 10px; }
 
-        .gallery-title { color: var(--gold); margin-top: 40px; margin-bottom: 10px; font-size: 1.6rem; text-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+        .gallery-title { color: var(--gold); margin-top: 40px; margin-bottom: 15px; font-size: 1.6rem; }
         
-        .carousel-container {
-            display: flex;
-            overflow-x: auto;
-            scroll-snap-type: x mandatory; 
-            gap: 15px;
-            padding: 15px 5px;
-            -webkit-overflow-scrolling: touch;
-            scroll-behavior: smooth;
-            direction: ltr; 
-        }
-        
+        .carousel-container { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 15px; padding: 15px 5px; -webkit-overflow-scrolling: touch; scroll-behavior: smooth; direction: ltr; }
         .carousel-container::-webkit-scrollbar { height: 6px; }
-        .carousel-container::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.5); border-radius: 10px; }
+        .carousel-container::-webkit-scrollbar-track { background: #1a1a1a; border-radius: 10px; }
         .carousel-container::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 10px; }
 
-        .gallery-item {
-            flex: 0 0 auto;
-            width: 200px; 
-            height: 250px; 
-            object-fit: cover;
-            border-radius: 12px;
-            border: 2px solid rgba(212, 175, 55, 0.6);
-            scroll-snap-align: center;
-            cursor: pointer;
-            transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
-            background-color: #333;
-        }
-        .gallery-item:hover {
-            transform: scale(1.05) translateY(-5px);
-            border-color: var(--gold);
-            box-shadow: 0 8px 25px rgba(212, 175, 55, 0.4);
-        }
+        .gallery-item { flex: 0 0 auto; width: 200px; height: 250px; object-fit: cover; border-radius: 10px; border: 2px solid var(--gold); scroll-snap-align: center; cursor: pointer; transition: transform 0.3s ease, box-shadow 0.3s ease; background-color: #333; }
+        .gallery-item:hover { transform: scale(1.03); box-shadow: 0 5px 15px rgba(212, 175, 55, 0.3); }
 
-        /* شاشة العرض الكاملة الفاخرة */
-        .image-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.95);
-            z-index: 9999;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            backdrop-filter: blur(5px);
-            animation: fadeIn 0.3s ease-out;
-        }
-        .modal-content {
-            max-width: 90%;
-            max-height: 85%;
-            border: 3px solid var(--gold);
-            border-radius: 10px;
-            box-shadow: 0 0 30px rgba(212, 175, 55, 0.5);
-            object-fit: contain;
-            animation: scaleUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        .close-modal {
-            position: absolute;
-            top: 20px;
-            right: 30px;
-            color: var(--gold);
-            font-size: 50px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: 0.3s;
-            z-index: 10000;
-        }
+        .image-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.92); z-index: 9999; display: flex; justify-content: center; align-items: center; flex-direction: column; }
+        .modal-content { max-width: 90%; max-height: 85%; border: 3px solid var(--gold); border-radius: 8px; box-shadow: 0 0 20px rgba(212, 175, 55, 0.4); object-fit: contain; }
+        .close-modal { position: absolute; top: 20px; right: 30px; color: var(--gold); font-size: 45px; font-weight: bold; cursor: pointer; transition: 0.3s; z-index: 10000; }
         .close-modal:hover { color: #fff; transform: scale(1.1); }
 
-        footer { 
-            background-color: rgba(11, 11, 11, 0.9); 
-            padding: 20px; 
-            font-size: 0.85rem; 
-            color: #888; 
-            border-top: 1px solid rgba(212, 175, 55, 0.2); 
-            margin-top: 50px; 
-            font-family: monospace, sans-serif; 
-            letter-spacing: 1px;
-            backdrop-filter: blur(5px);
-        }
-
-        /* --- محرك الـ CSS Keyframes الخاص بالتأثيرات الحركية --- */
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(25px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        @keyframes scaleUp {
-            from { transform: scale(0.8); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
-        }
-
-        @keyframes textGlow {
-            from {
-                text-shadow: 0 0 8px rgba(212, 175, 55, 0.3), 0 0 20px rgba(0,0,0,0.8);
-            }
-            to {
-                text-shadow: 0 0 18px rgba(212, 175, 55, 0.7), 0 0 10px rgba(212, 175, 55, 0.4);
-            }
-        }
-
-        .fade-in-up {
-            animation: fadeInUp 0.5s ease-out forwards;
-        }
+        footer { background-color: #0b0b0b; padding: 15px; font-size: 0.85rem; color: #777; border-top: 1px solid var(--gray); margin-top: 50px; font-family: monospace, sans-serif; letter-spacing: 1px;}
     </style>
 </head>
 <body>
-
-    <video autoplay loop muted playsinline id="bg-video">
-        <source src="https://assets.mixkit.co/videos/preview/mixkit-man-holding-a-hair-clipper-cutting-hair-40209-large.mp4" type="video/mp4">
-        </video>
-    <div class="video-overlay"></div>
 
     <audio id="notify-sound" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto"></audio>
 
@@ -709,7 +467,7 @@
                     <button id="btn-request" class="btn-whatsapp" onclick="window.requestBooking()">إرسال البيانات وفتح واتساب</button>
                 </div>
 
-                <div id="confirm-whatsapp-container" class="hidden" style="background-color: rgba(26, 46, 26, 0.85); padding: 20px; border-radius: 8px; border: 1px dashed var(--whatsapp); margin: 15px 0;">
+                <div id="confirm-whatsapp-container" class="hidden" style="background-color: #1a2e1a; padding: 20px; border-radius: 8px; border: 1px dashed var(--whatsapp); margin: 15px 0;">
                     <p style="color: #c3e6cb; margin-top: 0; font-size: 1.05rem; font-weight: bold;">انتبه من فضلك! ⚠️</p>
                     <p style="color: #fff; font-size: 0.95rem; line-height: 1.6;">تم فتح تطبيق الواتساب الآن. بعد إرسال الرسالة إلى الصالون، يرجى الضغط فوراً على الزر بالأسفل لتأكيد حجز مكانك رسمياً في طابور المحل الحية.</p>
                     
