@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AFANDINA Barbershop</title>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <link rel="manifest" href="data:application/manifest+json,{%22name%22:%22AFANDINA%22,%22short_name%22:%22Afandina%22,%22start_url%22:%22.%22,%22display%22:%22standalone%22,%22background_color%22:%22%23121212%22,%22theme_color%22:%22%23d4af37%22}" />
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getDatabase, ref, set, push, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+
+        const firebaseConfig = {
+          apiKey: "AIzaSyDnKcbzlhszXnn2Xtt56Cxi-wxIRzlQuw0",
+          authDomain: "afandina-e1308.firebaseapp.com",
+          databaseURL: "https://afandina-e1308-default-rtdb.firebaseio.com",
+          projectId: "afandina-e1308",
+          storageBucket: "afandina-e1308.firebasestorage.app",
+          messagingSenderId: "119994769923",
+          appId: "1:119994769923:web:c97202e912ccc68fc92436"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        
+        const queueRef = ref(db, 'queue');
+        const settingsRef = ref(db, 'settings');
+        
+        let currentUserId = localStorage.getItem('afandina_user_id');
+        let localQueue = [];
+        let lastKnownStatus = null;
+        let isShopOpen = true; 
+
+        let pendingBooking = null;
+
+        onValue(settingsRef, (snapshot) => {
+            const settings = snapshot.val();
+            if (settings && settings.shopStatus !== undefined) {
+                isShopOpen = settings.shopStatus;
+            }
+            toggleShopView();
+        });
+
+        onValue(queueRef, (snapshot) => {
+            const data = snapshot.val();
+            localQueue = [];
+            let doneCount = 0;
+
+            if (data) {
+                for (let key in data) {
+                    if (data[key].status === 'منتهي') {
+                        doneCount++;
+                    } else {
+                        localQueue.push({ id: key, ...data[key] });
+                    }
+                }
+            }
+            localQueue.sort((a, b) => a.timestamp - b.timestamp);
+            
+            document.getElementById('done-counter').innerText = doneCount;
+
+            if(!document.getElementById('admin-view').classList.contains('hidden')){
+                renderAdminView();
+            }
+            checkCustomerStatus();
+        });
+
+        function toggleShopView() {
+            const bookingBox = document.getElementById('step-1');
+            const closedMessage = document.getElementById('closed-message');
+            const statusToggleBtn = document.getElementById('btn-toggle-shop');
+
+            if (isShopOpen) {
+                if(closedMessage) closedMessage.classList.add('hidden');
+                if(bookingBox && !currentUserId) bookingBox.classList.remove('hidden');
+                if(statusToggleBtn) {
+                    statusToggleBtn.innerText = "المحل يستقبل حجوزات (اضغط للغلق)";
+                    statusToggleBtn.style.backgroundColor = "#4caf50";
+                }
+            } else {
+                if(bookingBox) bookingBox.classList.add('hidden');
+                if(closedMessage && !currentUserId) closedMessage.classList.remove('hidden');
+                if(statusToggleBtn) {
+                    statusToggleBtn.innerText = "المحل مغلق حالياً (اضغط للفتح)";
+                    statusToggleBtn.style.backgroundColor = "#f44336";
+                }
+            }
+        }
+
+        window.requestBooking = function() {
+            if (!isShopOpen) { alert('عذراً، المحل مغلق ولا يستقبل حجوزات الآن.'); return; }
+
+            const name = document.getElementById('customer-name').value.trim();
+            const phone = document.getElementById('customer-phone').value.trim();
+            
+            const checkboxes = document.querySelectorAll('#customer-services input[type="checkbox"]:checked');
+            let selectedServices = [];
+            checkboxes.forEach((cb) => selectedServices.push(cb.value));
+            
+            if(!name || !phone) { alert('برجاء إدخال الاسم ورقم التليفون'); return; }
+            if(!/^\d{11}$/.test(phone)) { alert('رقم التليفون يجب أن يكون 11 رقماً ويبدأ بـ 01 !'); return; }
+            if(selectedServices.length === 0) { alert('برجاء اختيار خدمة واحدة على الأقل'); return; }
+            
+            const existingCustomer = localQueue.find(q => q.phone === phone);
+            if(existingCustomer) {
+                currentUserId = existingCustomer.id;
+                localStorage.setItem('afandina_user_id', currentUserId);
+                alert('أهلاً بك مجدداً! تم استرجاع حالة حجزك.');
+                checkCustomerStatus();
+                return;
+            }
+
+            const serviceString = selectedServices.join(' + ');
+
+            pendingBooking = { name, phone, service: serviceString };
+
+            const targetWhatsAppNumber = "201091505674";
+            const messageBody = `👑 *طلب حجز جديد - صالون أفندينا* 👑\n\n` +
+                                `👤 *الاسم:* ${name}\n` +
+                                `📱 *رقم الهاتف:* ${phone}\n` +
+                                `✂️ *الخدمات المطلوبة:* ${serviceString}\n\n` +
+                                `⚠️ _برجاء العودة للموقع لتأكيد الدخول في الطابور_ ⚠️`;
+            const encodedMessage = encodeURIComponent(messageBody);
+            const whatsappUrl = `https://wa.me/${targetWhatsAppNumber}?text=${encodedMessage}`;
+            window.open(whatsappUrl, '_blank');
+
+            document.getElementById('inputs-container').classList.add('hidden');
+            document.getElementById('confirm-whatsapp-container').classList.remove('hidden');
+        };
+
+        window.confirmFinalBooking = function() {
+            if(!pendingBooking) { location.reload(); return; }
+
+            const btn = document.getElementById('btn-final-confirm');
+            btn.innerText = 'جاري حجز دورك وتحديث الطابور...';
+            btn.disabled = true;
+
+            const newCustomerRef = push(queueRef);
+            set(newCustomerRef, {
+                name: pendingBooking.name,
+                phone: pendingBooking.phone,
+                service: pendingBooking.service,
+                status: 'انتظار',
+                timestamp: Date.now()
+            }).then(() => {
+                currentUserId = newCustomerRef.key;
+                localStorage.setItem('afandina_user_id', currentUserId);
+                localStorage.setItem('afandina_phone', pendingBooking.phone);
+                
+                document.getElementById('inputs-container').classList.remove('hidden');
+                document.getElementById('confirm-whatsapp-container').classList.add('hidden');
+                pendingBooking = null;
+
+                checkCustomerStatus();
+            }).catch((error) => {
+                alert('حدث خطأ أثناء الحجز، برجاء المحاولة لاحقاً.');
+                btn.innerText = 'إرسال مجدد وتأكيد';
+                btn.disabled = false;
+            });
+        };
+
+        window.cancelBooking = function() {
+            if(confirm('هل أنت متأكد من رغبتك في إلغاء حجزك الحالي؟')) {
+                if(currentUserId) {
+                    remove(ref(db, 'queue/' + currentUserId)).then(() => {
+                        localStorage.removeItem('afandina_user_id');
+                        localStorage.removeItem('afandina_phone');
+                        currentUserId = null;
+                        location.reload();
+                    });
+                }
+            }
+        };
+
+        function checkCustomerStatus() {
+            if(!currentUserId) {
+                toggleShopView();
+                return;
+            }
+            const me = localQueue.find(q => q.id === currentUserId);
+            
+            if(me) {
+                document.getElementById('booking-form').classList.add('hidden');
+                document.getElementById('closed-message').classList.add('hidden');
+                document.getElementById('status-display').classList.remove('hidden');
+                document.getElementById('display-name').innerText = me.name;
+                
+                const statusBox = document.getElementById('current-status');
+                statusBox.innerText = me.status;
+                
+                let peopleAhead = 0;
+                localQueue.forEach(q => {
+                    if(q.status === 'انتظار' && q.timestamp < me.timestamp) {
+                        peopleAhead++;
+                    }
+                });
+
+                const waitDetails = document.getElementById('wait-details');
+                
+                if(me.status === 'يحلق الآن') {
+                    statusBox.className = 'status-box status-now pulse';
+                    waitDetails.innerHTML = '<strong>تفضل بالدخول، دورك الآن!</strong>';
+                    if(lastKnownStatus !== 'يحلق الآن') {
+                        document.getElementById('notify-sound').play().catch(e => console.log('صوت'));
+                    }
+                } else {
+                    statusBox.className = 'status-box status-wait';
+                    statusBox.classList.remove('pulse');
+                    const waitTime = peopleAhead * 30; 
+                    waitDetails.innerHTML = `أمامك: <strong>${peopleAhead}</strong> أشخاص<br>الوقت التقريبي: <strong>${waitTime}</strong> دقيقة`;
+                }
+                lastKnownStatus = me.status;
+
+            } else {
+                document.getElementById('booking-form').classList.remove('hidden');
+                document.getElementById('status-display').classList.add('hidden');
+                document.getElementById('step-1').classList.remove('hidden');
+                currentUserId = null;
+                lastKnownStatus = null;
+                localStorage.removeItem('afandina_user_id');
+                localStorage.removeItem('afandina_phone');
+                toggleShopView();
+            }
+        }
+
+        window.renderAdminView = function() {
+            const list = document.getElementById('queue-list');
+            list.innerHTML = '';
+            
+            if(localQueue.length === 0) { list.innerHTML = '<p>لا يوجد حجوزات حالياً</p>'; return; }
+
+            localQueue.forEach((customer, index) => {
+                list.innerHTML += `
+                    <div class="admin-card fade-in-up">
+                        <div style="text-align: right; flex-grow: 1;">
+                            <strong>${index + 1}. ${customer.name}</strong> 
+                            <div class="service-tag">${customer.service}</div>
+                            <small>${customer.phone}</small><br>
+                            <span style="color: ${customer.status === 'يحلق الآن' ? '#4caf50' : 'var(--gold)'}; font-weight: bold;">${customer.status}</span>
+                        </div>
+                        <div class="admin-btns">
+                            <button class="btn-now" onclick="window.updateStatus('${customer.id}', 'يحلق الآن')">يحلق الآن</button>
+                            <button class="btn-done" onclick="window.completeCustomer('${customer.id}')">إنهاء الحلاقة</button>
+                            <button class="btn-delete" onclick="window.removeCustomer('${customer.id}')">حذف نهائي</button>
+                        </div>
+                    </div>
+                `;
+            });
+        };
+
+        window.toggleShopStatus = function() {
+            const nextStatus = !isShopOpen;
+            update(settingsRef, { shopStatus: nextStatus });
+        };
+
+        window.addWalkIn = function() {
+            const name = document.getElementById('admin-add-name').value.trim();
+            const checkboxes = document.querySelectorAll('#admin-services input[type="checkbox"]:checked');
+            let selectedServices = [];
+            checkboxes.forEach((cb) => selectedServices.push(cb.value));
+            
+            if(!name) { alert('برجاء إدخال اسم الزبون'); return; }
+            if(selectedServices.length === 0) { alert('برجاء اختيار خدمة واحدة على الأقل'); return; }
+
+            const serviceString = selectedServices.join(' + ');
+            
+            const newCustomerRef = push(queueRef);
+            set(newCustomerRef, {
+                name: name,
+                phone: 'إضافة يدوية',
+                service: serviceString,
+                status: 'انتظار',
+                timestamp: Date.now()
+            }).then(() => {
+                document.getElementById('admin-add-name').value = '';
+                checkboxes.forEach(cb => cb.checked = false);
+                alert('تمت إضافة الزبون بنجاح');
+            });
+        };
+
+        window.updateStatus = (id, status) => update(ref(db, 'queue/' + id), { status });
+        window.completeCustomer = (id) => update(ref(db, 'queue/' + id), { status: 'منتهي' });
+        window.removeCustomer = (id) => { if(confirm('هل أنت متأكد من حذف هذا الدور؟')) remove(ref(db, 'queue/' + id)); };
+
+        window.loginAdmin = function() {
+            const pass = document.getElementById('admin-password').value;
+            if(pass === '1234') { 
+                document.getElementById('login-view').classList.add('hidden');
+                document.getElementById('admin-view').classList.remove('hidden');
+                document.getElementById('admin-password').value = '';
+                renderAdminView();
+            } else {
+                alert('كلمة المرور خاطئة!');
+            }
+        };
+
+        window.switchView = function(viewId) {
+            document.getElementById('customer-view').classList.add('hidden');
+            document.getElementById('admin-view').classList.add('hidden');
+            document.getElementById('login-view').classList.add('hidden');
+            document.getElementById(viewId).classList.remove('hidden');
+        };
+
+        window.openModal = function(imageSrc) {
+            const modal = document.getElementById('image-modal');
+            const modalImg = document.getElementById('modal-img');
+            modalImg.src = imageSrc;
+            modal.classList.remove('hidden');
+        };
+
+        window.closeModal = function() {
+            const modal = document.getElementById('image-modal');
+            const modalImg = document.getElementById('modal-img');
+            modal.classList.add('hidden');
+            setTimeout(() => { modalImg.src = ''; }, 300);
+        };
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('data:application/javascript;base64,c2VsZi5hZGRFdmVudExpc3RlbmVyKCdmZXRjaCcsIGZ1bmN0aW9uKGV2ZW50KSB7fSk7')
+            .catch(err => console.log('PWA Service Worker Init'));
+        }
+
+        setTimeout(checkCustomerStatus, 1000);
+    </script>
+
+    <style>
+        :root { --gold: #d4af37; --dark: #121212; --gray: rgba(42, 42, 42, 0.75); --text: #ffffff; --whatsapp: #25D366; }
+        
+        /* تأثير الخلفية المفرغة للفيديو الأساسي */
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #000; 
+            color: var(--text); 
+            margin: 0; 
+            padding: 0; 
+            text-align: center; 
+            overflow-x: hidden;
+        }
+
+        /* تنسيقات مشغل الفيديو في الخلفية */
+        #bg-video {
+            position: fixed;
+            right: 0;
+            bottom: 0;
+            min-width: 100%;
+            min-height: 100%;
+            z-index: -2;
+            object-fit: cover;
+            filter: grayscale(40%) brightness(45%); /* تصفية الألوان لثيم صالون كلاسيكي فاخر */
+        }
+
+        .video-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, rgba(18, 18, 18, 0.5) 0%, rgba(0, 0, 0, 0.85) 100%);
+            z-index: -1;
+        }
+        
+        header { 
+            background-color: rgba(20, 20, 20, 0.85); 
+            padding: 25px 20px; 
+            border-bottom: 3px solid var(--gold); 
+            position: relative; 
+            backdrop-filter: blur(8px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+        }
+        
+        h1 { 
+            color: var(--gold); 
+            margin: 0; 
+            font-size: 2.7rem; 
+            letter-spacing: 3px;
+            text-shadow: 0 0 10px rgba(212, 175, 55, 0.4);
+            animation: textGlow 3s ease-in-out infinite alternate;
+        }
+        p.manager { margin: 8px 0 0; font-size: 0.95rem; color: #ccc; font-weight: 300; }
+        
+        .dev-profile-icon {
+            position: absolute;
+            top: 22px;
+            left: 20px;
+            color: var(--gold);
+            text-decoration: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 0.75rem;
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+        .dev-profile-icon:hover {
+            transform: scale(1.1) rotate(-5deg);
+            color: #fff;
+            text-shadow: 0 0 8px var(--gold);
+        }
+        .dev-profile-icon svg {
+            width: 24px;
+            height: 24px;
+            margin-bottom: 3px;
+        }
+
+        /* حاوية محتوى أنيقة مع تأثير الزجاج الضبابي (Glassmorphism) وطاقة حركية للظهور */
+        .container { 
+            max-width: 600px; 
+            margin: 35px auto; 
+            padding: 25px; 
+            background-color: var(--gray); 
+            border-radius: 15px; 
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(212, 175, 55, 0.2);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.7); 
+            width: 90%; 
+            box-sizing: border-box; 
+            animation: fadeInUp 0.8s ease-out forwards;
+        }
+        
+        input[type="text"], input[type="tel"], input[type="password"], input[type="number"] { 
+            width: 100%; 
+            padding: 14px; 
+            margin: 12px 0; 
+            border: 1px solid rgba(212, 175, 55, 0.5); 
+            background-color: rgba(18, 18, 18, 0.8); 
+            color: white; 
+            border-radius: 8px; 
+            box-sizing: border-box; 
+            font-family: inherit; 
+            font-size: 1rem; 
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        input[type="text"]:focus, input[type="tel"]:focus, input[type="password"]:focus {
+            border-color: var(--gold);
+            box-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+            outline: none;
+            background-color: rgba(18, 18, 18, 0.95);
+        }
+        
+        .checkbox-group { 
+            text-align: right; 
+            background-color: rgba(18, 18, 18, 0.7); 
+            border: 1px solid rgba(212, 175, 55, 0.3); 
+            border-radius: 8px; 
+            padding: 15px; 
+            margin: 15px 0; 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 14px; 
+            direction: rtl;
+        }
+        .checkbox-label { 
+            display: flex; 
+            align-items: center; 
+            gap: 10px; 
+            cursor: pointer; 
+            font-size: 0.95rem; 
+            user-select: none; 
+            transition: transform 0.2s ease, color 0.2s;
+        }
+        .checkbox-label:hover {
+            transform: translateX(-3px);
+            color: var(--gold);
+        }
+        .checkbox-label input[type="checkbox"] { 
+            width: 19px; 
+            height: 19px; 
+            accent-color: var(--gold); 
+            cursor: pointer; 
+            margin: 0; 
+        }
+        @media (max-width: 400px) { .checkbox-group { grid-template-columns: 1fr; } } 
+
+        button { 
+            background-color: var(--gold); 
+            color: #000; 
+            border: none; 
+            padding: 14px 25px; 
+            font-size: 1.1rem; 
+            font-weight: bold; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            width: 100%; 
+            margin-top: 12px; 
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); 
+            box-shadow: 0 4px 10px rgba(212, 175, 55, 0.2);
+        }
+        button:hover:not(:disabled) { 
+            background-color: #f7d154; 
+            transform: translateY(-2px); 
+            box-shadow: 0 6px 15px rgba(212, 175, 55, 0.4);
+        }
+        button:active:not(:disabled) {
+            transform: translateY(1px);
+        }
+        button:disabled { background-color: #555; cursor: not-allowed; color: #888; box-shadow: none; }
+        
+        .btn-whatsapp { 
+            background-color: var(--whatsapp); 
+            color: white; 
+            box-shadow: 0 4px 10px rgba(37, 211, 102, 0.2);
+        }
+        .btn-whatsapp:hover:not(:disabled) { 
+            background-color: #2edb72; 
+            box-shadow: 0 6px 15px rgba(37, 211, 102, 0.4);
+        }
+
+        .hidden { display: none !important; }
+        
+        .status-box { padding: 20px; margin-top: 15px; border-radius: 8px; font-size: 1.5rem; font-weight: bold; transition: all 0.3s; }
+        .status-wait { background-color: #ff9800; color: white; box-shadow: 0 0 15px rgba(255,152,0,0.3); }
+        .status-now { background-color: #4caf50; color: white; }
+        .wait-info { background-color: rgba(18, 18, 18, 0.8); padding: 15px; margin-top: 15px; border-radius: 5px; border: 1px dashed var(--gold); line-height: 1.8; }
+        
+        @keyframes pulsing {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
+            70% { transform: scale(1.04); box-shadow: 0 0 0 15px rgba(76, 175, 80, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
+        }
+        .pulse { animation: pulsing 2s infinite; }
+
+        .admin-card { background-color: rgba(18, 18, 18, 0.85); padding: 15px; margin: 15px 0; border: 1px solid #444; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .admin-btns { display: flex; flex-direction: column; gap: 5px; min-width: 100px; }
+        .btn-now { background-color: #4caf50; color: white; border: none; padding: 7px; width: 100%; font-size: 0.85rem; border-radius: 4px;}
+        .btn-done { background-color: #2196f3; color: white; border: none; padding: 7px; width: 100%; font-size: 0.85rem; border-radius: 4px;}
+        .btn-delete { background-color: #f44336; color: white; border: none; padding: 7px; width: 100%; font-size: 0.85rem; border-radius: 4px;}
+        .service-tag { display: inline-block; font-size: 0.8rem; background: #333; color: var(--gold); padding: 4px 8px; border-radius: 4px; margin: 5px 0; line-height: 1.4;}
+        
+        .add-manual-box, .stats-box { background-color: rgba(26, 26, 26, 0.85); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #333; }
+        .stats-box { font-size: 1.2rem; color: var(--gold); font-weight: bold; }
+        .nav-link { color: var(--gold); cursor: pointer; margin-top: 25px; display: inline-block; text-decoration: underline; font-size: 0.95rem; transition: color 0.2s; }
+        .nav-link:hover { color: #f7d154; }
+        
+        .btn-cancel { background-color: #f44336; color: white; margin-top: 15px; font-size: 1rem; padding: 12px; box-shadow: 0 4px 10px rgba(244,67,54,0.2); }
+        .btn-cancel:hover { background-color: #ff5246; box-shadow: 0 6px 15px rgba(244,67,54,0.4); }
+        .shop-closed-banner { background-color: rgba(58, 26, 26, 0.85); border: 2px dashed #f44336; padding: 25px; border-radius: 8px; font-size: 1.2rem; color: #ff8888; margin-top: 10px; }
+
+        .gallery-title { color: var(--gold); margin-top: 40px; margin-bottom: 10px; font-size: 1.6rem; text-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+        
+        .carousel-container {
+            display: flex;
+            overflow-x: auto;
+            scroll-snap-type: x mandatory; 
+            gap: 15px;
+            padding: 15px 5px;
+            -webkit-overflow-scrolling: touch;
+            scroll-behavior: smooth;
+            direction: ltr; 
+        }
+        
+        .carousel-container::-webkit-scrollbar { height: 6px; }
+        .carousel-container::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.5); border-radius: 10px; }
+        .carousel-container::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 10px; }
+
+        .gallery-item {
+            flex: 0 0 auto;
+            width: 200px; 
+            height: 250px; 
+            object-fit: cover;
+            border-radius: 12px;
+            border: 2px solid rgba(212, 175, 55, 0.6);
+            scroll-snap-align: center;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+            background-color: #333;
+        }
+        .gallery-item:hover {
+            transform: scale(1.05) translateY(-5px);
+            border-color: var(--gold);
+            box-shadow: 0 8px 25px rgba(212, 175, 55, 0.4);
+        }
+
+        /* شاشة العرض الكاملة الفاخرة */
+        .image-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.95);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            backdrop-filter: blur(5px);
+            animation: fadeIn 0.3s ease-out;
+        }
+        .modal-content {
+            max-width: 90%;
+            max-height: 85%;
+            border: 3px solid var(--gold);
+            border-radius: 10px;
+            box-shadow: 0 0 30px rgba(212, 175, 55, 0.5);
+            object-fit: contain;
+            animation: scaleUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .close-modal {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            color: var(--gold);
+            font-size: 50px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+            z-index: 10000;
+        }
+        .close-modal:hover { color: #fff; transform: scale(1.1); }
+
+        footer { 
+            background-color: rgba(11, 11, 11, 0.9); 
+            padding: 20px; 
+            font-size: 0.85rem; 
+            color: #888; 
+            border-top: 1px solid rgba(212, 175, 55, 0.2); 
+            margin-top: 50px; 
+            font-family: monospace, sans-serif; 
+            letter-spacing: 1px;
+            backdrop-filter: blur(5px);
+        }
+
+        /* --- محرك الـ CSS Keyframes الخاص بالتأثيرات الحركية --- */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(25px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes scaleUp {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes textGlow {
+            from {
+                text-shadow: 0 0 8px rgba(212, 175, 55, 0.3), 0 0 20px rgba(0,0,0,0.8);
+            }
+            to {
+                text-shadow: 0 0 18px rgba(212, 175, 55, 0.7), 0 0 10px rgba(212, 175, 55, 0.4);
+            }
+        }
+
+        .fade-in-up {
+            animation: fadeInUp 0.5s ease-out forwards;
+        }
+    </style>
+</head>
+<body>
+
+    <video autoplay loop muted playsinline id="bg-video">
+        <source src="https://assets.mixkit.co/videos/preview/mixkit-man-holding-a-hair-clipper-cutting-hair-40209-large.mp4" type="video/mp4">
+        </video>
+    <div class="video-overlay"></div>
+
+    <audio id="notify-sound" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto"></audio>
+
+    <header>
+        <a href="https://ehabashraf20.vercel.app" target="_blank" class="dev-profile-icon" title="الملف الشخصي للمطور">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            <span>المطور</span>
+        </a>
+
+        <h1>AFANDINA</h1>
+        <p class="manager">Management: Mohamed El-Shahat</p>
+    </header>
+
+    <div id="customer-view" class="container">
+        <h2>احجز دورك الآن</h2>
+        
+        <div id="booking-form">
+            <div id="closed-message" class="shop-closed-banner hidden">
+                عذراً، المحل لا يستقبل حجوزات جديدة حالياً.<br>
+                <small style="font-size: 0.85rem; color: #aaa;">يمكنك القدوم مباشرة للمحل أو المحاولة لاحقاً.</small>
+            </div>
+
+            <div id="step-1">
+                <div id="inputs-container">
+                    <input type="text" id="customer-name" placeholder="الاسم الكريم">
+                    <input type="tel" id="customer-phone" placeholder="رقم التليفون (11 رقم)">
+                    
+                    <div id="customer-services" class="checkbox-group">
+                        <label class="checkbox-label"><input type="checkbox" value="حلاقة شعر"> حلاقة شعر</label>
+                        <label class="checkbox-label"><input type="checkbox" value="حلاقة دقن"> حلاقة دقن</label>
+                        <label class="checkbox-label"><input type="checkbox" value="استشوار ومكواة"> استشوار ومكواة</label>
+                        <label class="checkbox-label"><input type="checkbox" value="تنظيف بشرة VIP"> تنظيف بشرة VIP</label>
+                        <label class="checkbox-label"><input type="checkbox" value="صبغة شعر"> صبغة شعر</label>
+                        <label class="checkbox-label"><input type="checkbox" value="كيرلي أو ويفي"> كيرلي أو ويفي</label>
+                    </div>
+
+                    <button id="btn-request" class="btn-whatsapp" onclick="window.requestBooking()">إرسال البيانات وفتح واتساب</button>
+                </div>
+
+                <div id="confirm-whatsapp-container" class="hidden" style="background-color: rgba(26, 46, 26, 0.85); padding: 20px; border-radius: 8px; border: 1px dashed var(--whatsapp); margin: 15px 0;">
+                    <p style="color: #c3e6cb; margin-top: 0; font-size: 1.05rem; font-weight: bold;">انتبه من فضلك! ⚠️</p>
+                    <p style="color: #fff; font-size: 0.95rem; line-height: 1.6;">تم فتح تطبيق الواتساب الآن. بعد إرسال الرسالة إلى الصالون، يرجى الضغط فوراً على الزر بالأسفل لتأكيد حجز مكانك رسمياً في طابور المحل الحية.</p>
+                    
+                    <button id="btn-final-confirm" onclick="window.confirmFinalBooking()" style="background-color: #4caf50; color: white; border: none; font-size: 1.1rem; padding: 14px;">
+                        اضغط هنا لتأكيد الدخول في الطابور بعد الإرسال
+                    </button>
+                    <span class="nav-link" onclick="window.location.reload()" style="font-size: 0.85rem; color: #ff8888; display: block; margin-top: 15px;">تعديل البيانات أو البدء مجدداً؟</span>
+                </div>
+            </div>
+        </div>
+        
+        <div id="status-display" class="hidden">
+            <h3>مرحباً <span id="display-name" style="color: var(--gold);"></span></h3>
+            <p>حالة دورك الحالية:</p>
+            <div id="current-status" class="status-box"></div>
+            <div id="wait-details" class="wait-info"></div>
+            
+            <button class="btn-cancel" onclick="window.cancelBooking()">إلغاء حجز دوري</button>
+            
+            <p style="margin-top:20px; font-size:0.8rem; color:#888;">(هذه الشاشة تتحدث تلقائياً.. لا تقم بإغلاقها)</p>
+        </div>
+        
+        <h3 class="gallery-title">✂️ أحدث صيحات وقصات أفندينا</h3>
+        
+        <div class="carousel-container">
+            <img class="gallery-item" src="images/1.jpg" alt="قصة 1" onclick="window.openModal(this.src)">
+            <img class="gallery-item" src="images/2.jpg" alt="قصة 2" onclick="window.openModal(this.src)">
+            <img class="gallery-item" src="images/3.jpg" alt="قصة 3" onclick="window.openModal(this.src)">
+            <img class="gallery-item" src="images/4.jpg" alt="قصة 4" onclick="window.openModal(this.src)">
+            <img class="gallery-item" src="images/5.jpg" alt="قصة 5" onclick="window.openModal(this.src)">
+            <img class="gallery-item" src="images/6.jpg" alt="قصة 6" onclick="window.openModal(this.src)">
+            <img class="gallery-item" src="images/7.jpg" alt="قصة 7" onclick="window.openModal(this.src)">
+            <img class="gallery-item" src="images/8.jpg" alt="قصة 8" onclick="window.openModal(this.src)">
+            <img class="gallery-item" src="images/9.jpg" alt="قصة 9" onclick="window.openModal(this.src)">
+            <img class="gallery-item" src="images/10.jpg" alt="قصة 10" onclick="window.openModal(this.src)">
+        </div>
+
+        <span class="nav-link" onclick="window.switchView('login-view')">تسجيل دخول الإدارة</span>
+    </div>
+
+    <div id="image-modal" class="image-modal hidden">
+        <span class="close-modal" onclick="window.closeModal()">&times;</span>
+        <img class="modal-content" id="modal-img" src="" alt="صورة مكبرة">
+    </div>
+
+    <div id="login-view" class="container hidden">
+        <h2 style="color: var(--gold);">بوابة الإدارة</h2>
+        <input type="password" id="admin-password" placeholder="كلمة المرور">
+        <button onclick="window.loginAdmin()">دخول</button>
+        <br>
+        <span class="nav-link" onclick="window.switchView('customer-view')">عودة لواجهة الزبائن</span>
+    </div>
+
+    <div id="admin-view" class="container hidden">
+        <h2 style="color: var(--gold);">لوحة تحكم أفندينا</h2>
+        
+        <div class="add-manual-box" style="border-color: var(--gold);">
+            <h4 style="margin-top:0;">حالة استقبال الحجوزات أونلاين</h4>
+            <button id="btn-toggle-shop" onclick="window.toggleShopStatus()" style="width:auto; min-width:200px;">جاري التحميل...</button>
+        </div>
+
+        <div class="stats-box">
+            ✔️ إجمالي عدد الزباين اللي حلقوا وخلصوا النهاردة: <span id="done-counter" style="font-size:1.5rem; color:white;">0</span> زباين
+        </div>
+        
+        <div class="add-manual-box">
+            <h4 style="margin-top: 0;">إضافة زبون داخل المحل (يدوي)</h4>
+            <input type="text" id="admin-add-name" placeholder="اسم الزبون">
+            
+            <div id="admin-services" class="checkbox-group">
+                <label class="checkbox-label"><input type="checkbox" value="حلاقة شعر"> حلاقة شعر</label>
+                <label class="checkbox-label"><input type="checkbox" value="حلاقة دقن"> حلاقة دقن</label>
+                <label class="checkbox-label"><input type="checkbox" value="استشوار ومكواة"> استشوار ومكواة</label>
+                <label class="checkbox-label"><input type="checkbox" value="تنظيف بشرة VIP"> تنظيف بشرة VIP</label>
+                <label class="checkbox-label"><input type="checkbox" value="صبغة شعر"> صبغة شعر</label>
+                <label class="checkbox-label"><input type="checkbox" value="كيرلي أو ويفي"> كيرلي أو ويفي</label>
+            </div>
+
+            <button onclick="window.addWalkIn()" style="background-color: #2196f3; color: white;">إضافة للطابور</button>
+        </div>
+
+        <h3 style="border-bottom: 1px solid #444; padding-bottom: 10px;">طابور الانتظار الحالي:</h3>
+        <div id="queue-list"></div>
+        
+        <span class="nav-link" onclick="window.switchView('customer-view')">تسجيل خروج / عودة</span>
+    </div>
+
+    <footer>
+        Developed by Ehab Ashraf © 2026
+    </footer>
+
+</body>
+</html>
