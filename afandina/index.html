@@ -332,25 +332,25 @@
         h1 { color: var(--gold); margin: 0; font-size: 2.5rem; letter-spacing: 2px;}
         p.manager { margin: 5px 0 0; font-size: 0.9rem; color: #aaa; }
         
-        /* التصميم الجديد لأيقونة المطور */
+        /* الأيقونة المعدلة: أصغر وبجهة الشمال */
         .dev-profile-icon {
             position: absolute;
             top: 15px;
-            right: 15px; 
+            left: 15px; 
             background-color: var(--gold);
             color: var(--dark);
-            width: 50px;
-            height: 50px;
+            width: 40px; /* تصغير العرض */
+            height: 40px; /* تصغير الطول */
             border-radius: 50%;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             text-decoration: none;
-            font-size: 0.65rem;
+            font-size: 0.55rem; /* تصغير الخط */
             transition: transform 0.3s ease;
             font-weight: bold;
-            box-shadow: 0 3px 8px rgba(0,0,0,0.5);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.4);
             border: 2px solid #fff;
         }
         .dev-profile-icon:hover {
@@ -358,9 +358,9 @@
             background-color: #fff;
         }
         .dev-profile-icon svg {
-            width: 20px;
-            height: 20px;
-            margin-bottom: 2px;
+            width: 16px; /* تصغير الأيقونة */
+            height: 16px;
+            margin-bottom: 1px;
         }
 
         .container { max-width: 600px; margin: 30px auto; padding: 20px; background-color: var(--gray); border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); width: 90%; box-sizing: border-box; }
