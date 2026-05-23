@@ -31,6 +31,7 @@
         
         let currentUserId = localStorage.getItem('afandina_user_id');
         let localQueue = [];
+        let archiveQueue = []; 
         let lastKnownStatus = null;
         let isShopOpen = true; 
 
@@ -47,23 +48,30 @@
         onValue(queueRef, (snapshot) => {
             const data = snapshot.val();
             localQueue = [];
+            archiveQueue = []; 
             let doneCount = 0;
 
             if (data) {
                 for (let key in data) {
-                    if (data[key].status === 'منتهي') {
+                    const item = { id: key, ...data[key] };
+                    if (item.status === 'منتهي') {
                         doneCount++;
+                        archiveQueue.push(item);
+                    } else if (item.status === 'محذوف' || item.status === 'ملغي') {
+                        archiveQueue.push(item);
                     } else {
-                        localQueue.push({ id: key, ...data[key] });
+                        localQueue.push(item);
                     }
                 }
             }
             localQueue.sort((a, b) => a.timestamp - b.timestamp);
+            archiveQueue.sort((a, b) => b.timestamp - a.timestamp); 
             
             document.getElementById('done-counter').innerText = doneCount;
 
             if(!document.getElementById('admin-view').classList.contains('hidden')){
                 renderAdminView();
+                renderArchiveView();
             }
             checkCustomerStatus();
         });
@@ -114,10 +122,7 @@
             }
 
             const serviceString = selectedServices.join(' + ');
-
             pendingBooking = { name, phone, service: serviceString };
-
-            // تم تعديل رقم الواتساب هنا
             const targetWhatsAppNumber = "201031284943"; 
             
             const messageBody = `👑 *طلب حجز جديد - صالون أفندينا* 👑\n\n` +
@@ -167,7 +172,7 @@
         window.cancelBooking = function() {
             if(confirm('هل أنت متأكد من رغبتك في إلغاء حجزك الحالي؟')) {
                 if(currentUserId) {
-                    remove(ref(db, 'queue/' + currentUserId)).then(() => {
+                    update(ref(db, 'queue/' + currentUserId), { status: 'ملغي' }).then(() => {
                         localStorage.removeItem('afandina_user_id');
                         localStorage.removeItem('afandina_phone');
                         currentUserId = null;
@@ -246,11 +251,48 @@
                         <div class="admin-btns">
                             <button class="btn-now" onclick="window.updateStatus('${customer.id}', 'يحلق الآن')">يحلق الآن</button>
                             <button class="btn-done" onclick="window.completeCustomer('${customer.id}')">إنهاء الحلاقة</button>
-                            <button class="btn-delete" onclick="window.removeCustomer('${customer.id}')">حذف نهائي</button>
+                            <button class="btn-delete" onclick="window.removeCustomer('${customer.id}')">حذف للأرشيف</button>
                         </div>
                     </div>
                 `;
             });
+        };
+
+        window.renderArchiveView = function() {
+            const list = document.getElementById('archive-list');
+            list.innerHTML = '';
+            
+            if(archiveQueue.length === 0) { list.innerHTML = '<p style="color: #aaa; text-align:center;">السجل فارغ حالياً</p>'; return; }
+
+            archiveQueue.forEach((customer) => {
+                let typeLabel = '';
+                if (customer.status === 'منتهي') {
+                    typeLabel = '<span style="color:#2196f3; font-weight:bold;">[تمت الحلاقة]</span>';
+                } else if (customer.status === 'محذوف') {
+                    typeLabel = '<span style="color:#f44336; font-weight:bold;">[حذف الإدارة]</span>';
+                } else if (customer.status === 'ملغي') {
+                    typeLabel = '<span style="color:#e91e63; font-weight:bold;">[الزبون لغى ❌]</span>';
+                }
+
+                list.innerHTML += `
+                    <div class="admin-card" style="border-color: #444; background-color: #1a1a1a;">
+                        <div style="text-align: right; flex-grow: 1;">
+                            <strong>${customer.name}</strong> ${typeLabel}
+                            <div class="service-tag">${customer.service}</div>
+                            <small>${customer.phone}</small>
+                        </div>
+                        <div class="admin-btns">
+                            <button class="btn-now" style="background-color: #ff9800; color: white;" onclick="window.restoreCustomer('${customer.id}')">إرجاع للطابور</button>
+                            <button class="btn-delete" onclick="window.hardDeleteCustomer('${customer.id}')">مسح نهائي</button>
+                        </div>
+                    </div>
+                `;
+            });
+        };
+
+        window.toggleArchive = function() {
+            const container = document.getElementById('archive-container');
+            container.classList.toggle('hidden');
         };
 
         window.toggleShopStatus = function() {
@@ -285,15 +327,19 @@
 
         window.updateStatus = (id, status) => update(ref(db, 'queue/' + id), { status });
         window.completeCustomer = (id) => update(ref(db, 'queue/' + id), { status: 'منتهي' });
-        window.removeCustomer = (id) => { if(confirm('هل أنت متأكد من حذف هذا الدور؟')) remove(ref(db, 'queue/' + id)); };
+        window.removeCustomer = (id) => { if(confirm('هل أنت متأكد من نقل هذا الحجز إلى الأرشيف؟')) update(ref(db, 'queue/' + id), { status: 'محذوف' }); };
+        window.restoreCustomer = (id) => { if(confirm('هل تريد إرجاع هذا الزبون لطابور الانتظار مجدداً؟')) update(ref(db, 'queue/' + id), { status: 'انتظار' }); };
+        window.hardDeleteCustomer = (id) => { if(confirm('⚠️ تنبيه: سيتم مسح هذا الزبون نهائياً من قاعدة البيانات! هل أنت متأكد؟')) remove(ref(db, 'queue/' + id)); };
 
+        // تعديل الرقم السري هنا
         window.loginAdmin = function() {
             const pass = document.getElementById('admin-password').value;
-            if(pass === '1234') { 
+            if(pass === '1020') { 
                 document.getElementById('login-view').classList.add('hidden');
                 document.getElementById('admin-view').classList.remove('hidden');
                 document.getElementById('admin-password').value = '';
                 renderAdminView();
+                renderArchiveView();
             } else {
                 alert('كلمة المرور خاطئة!');
             }
@@ -334,22 +380,21 @@
         h1 { color: var(--gold); margin: 0; font-size: 2.5rem; letter-spacing: 2px;}
         p.manager { margin: 5px 0 0; font-size: 0.9rem; color: #aaa; }
         
-        /* الأيقونة المعدلة: أصغر وبجهة الشمال */
         .dev-profile-icon {
             position: absolute;
             top: 15px;
             left: 15px; 
             background-color: var(--gold);
             color: var(--dark);
-            width: 40px; /* تصغير العرض */
-            height: 40px; /* تصغير الطول */
+            width: 40px; 
+            height: 40px; 
             border-radius: 50%;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             text-decoration: none;
-            font-size: 0.55rem; /* تصغير الخط */
+            font-size: 0.55rem; 
             transition: transform 0.3s ease;
             font-weight: bold;
             box-shadow: 0 2px 5px rgba(0,0,0,0.4);
@@ -360,7 +405,7 @@
             background-color: #fff;
         }
         .dev-profile-icon svg {
-            width: 16px; /* تصغير الأيقونة */
+            width: 16px; 
             height: 16px;
             margin-bottom: 1px;
         }
@@ -553,6 +598,14 @@
 
         <h3 style="border-bottom: 1px solid #444; padding-bottom: 10px;">طابور الانتظار الحالي:</h3>
         <div id="queue-list"></div>
+        
+        <div class="add-manual-box" style="margin-top: 30px; border-color: #555;">
+            <button id="btn-toggle-archive" onclick="window.toggleArchive()" style="background-color: #232323; color: var(--gold); border: 1px solid var(--gold); font-size: 1rem; padding: 10px;">👁️ عرض / إخفاء سجل العمليات (المحلوقين، المحذوفين، والملغيين)</button>
+            <div id="archive-container" class="hidden" style="margin-top: 15px;">
+                <h4 style="border-bottom: 1px solid #444; padding-bottom: 5px; color: var(--gold); text-align: right; margin-top: 0;">سجل الحركات اليومية:</h4>
+                <div id="archive-list"></div>
+            </div>
+        </div>
         
         <span class="nav-link" onclick="window.switchView('customer-view')">تسجيل خروج / عودة</span>
     </div>
